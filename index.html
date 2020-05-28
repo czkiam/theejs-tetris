@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>orbit 3d tetris</title>
+
+    <link rel="stylesheet" href="./style/app.css" />
+  </head>
+
+  <body>
+    <div id="menu">
+      <h1>Three.js Tetris</h1>
+      <p>
+        Movement: arrows<br />
+        Rotation: AD/SW/QE<br />
+      </p>
+      <button id="play_button">Play</button>
+    </div>
+
+    <div id="points">
+      0
+    </div>
+
+    <script type="module" src="./js/script.js"></script>
+    <script src="./libs/cufon-yui.js" type="text/javascript"></script>
+    <script src="./libs/Blox_400.font.js" type="text/javascript"></script>
+
+    <script type="text/javascript">
+      Cufon.replace("#menu h1");
+      Cufon.replace("#points");
+    </script>
+  </body>
+</html>
