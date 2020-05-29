@@ -76,6 +76,12 @@ Tetris.init = function () {
   Tetris.blockSize =
     Tetris.boundingBoxConfig.width / Tetris.boundingBoxConfig.splitX;
 
+  Tetris.Board.init(
+    Tetris.boundingBoxConfig.splitX,
+    Tetris.boundingBoxConfig.splitY,
+    Tetris.boundingBoxConfig.splitZ
+  );
+
   var boundingBox = new THREE.Mesh(
     new THREE.CubeGeometry(
       Tetris.boundingBoxConfig.width,
@@ -251,6 +257,12 @@ Tetris.Utils.cloneVector = function (v) {
   return { x: v.x, y: v.y, z: v.z };
 };
 
+Tetris.Utils.roundVector = function(v) {
+  v.x = Math.round(v.x);
+  v.y = Math.round(v.y);
+  v.z = Math.round(v.z);
+};
+
 Tetris.Block = {};
 
 Tetris.Block.shapes = [
@@ -300,23 +312,23 @@ Tetris.Block.generate = function () {
     );
   }
 
-  geometry =  new THREE.CubeGeometry()
+  geometry = new THREE.CubeGeometry();
 
-  tmpGeometryMesh = new THREE.Mesh(new THREE.CubeGeometry(
-    Tetris.blockSize,
-    Tetris.blockSize,
-    Tetris.blockSize
-  ));
+  tmpGeometryMesh = new THREE.Mesh(
+    new THREE.CubeGeometry(Tetris.blockSize, Tetris.blockSize, Tetris.blockSize)
+  );
 
-  tmpGeometryMesh.updateMatrix()
-  geometry.merge(tmpGeometryMesh.geometry, tmpGeometryMesh.matrix)
-  
+  tmpGeometryMesh.updateMatrix();
+  geometry.merge(tmpGeometryMesh.geometry, tmpGeometryMesh.matrix);
+
   for (var i = 1; i < Tetris.Block.shape.length; i++) {
-    tmpGeometryMesh = new THREE.Mesh(new THREE.CubeGeometry(
-      Tetris.blockSize,
-      Tetris.blockSize,
-      Tetris.blockSize
-    ));
+    tmpGeometryMesh = new THREE.Mesh(
+      new THREE.CubeGeometry(
+        Tetris.blockSize,
+        Tetris.blockSize,
+        Tetris.blockSize
+      )
+    );
     tmpGeometryMesh.position.x = Tetris.blockSize * Tetris.Block.shape[i].x;
     tmpGeometryMesh.position.y = Tetris.blockSize * Tetris.Block.shape[i].y;
     tmpGeometryMesh.updateMatrix(); // as needed
@@ -326,7 +338,7 @@ Tetris.Block.generate = function () {
   Tetris.Block.mesh = SceneUtils.createMultiMaterialObject(geometry, [
     new THREE.MeshBasicMaterial({
       color: 0x000000,
-      shading: THREE.FlatShading,
+      flatShading: true,
       wireframe: true,
       transparent: true,
     }),
@@ -340,6 +352,13 @@ Tetris.Block.generate = function () {
     z: 15,
   };
 
+  if (Tetris.Board.testCollision(true) === Tetris.Board.COLLISION.GROUND) {
+    Tetris.gameOver = true;
+    Tetris.pointsDOM.innerHTML = "GAME OVER";
+    //Tetris.sounds["gameover"].play();
+    Cufon.replace("#points");
+  }
+
   Tetris.Block.mesh.position.x =
     ((Tetris.Block.position.x - Tetris.boundingBoxConfig.splitX / 2) *
       Tetris.blockSize) /
@@ -352,7 +371,7 @@ Tetris.Block.generate = function () {
     (Tetris.Block.position.z - Tetris.boundingBoxConfig.splitZ / 2) *
       Tetris.blockSize +
     Tetris.blockSize / 2;
-  Tetris.Block.mesh.rotation.set( 0, 0, 0 )
+  Tetris.Block.mesh.rotation.set(0, 0, 0);
   Tetris.Block.mesh.overdraw = true;
 
   Tetris.scene.add(Tetris.Block.mesh);
@@ -362,6 +381,20 @@ Tetris.Block.rotate = function (x, y, z) {
   Tetris.Block.mesh.rotation.x += (x * Math.PI) / 180;
   Tetris.Block.mesh.rotation.y += (y * Math.PI) / 180;
   Tetris.Block.mesh.rotation.z += (z * Math.PI) / 180;
+  Tetris.Block.mesh.updateMatrix();
+  // var rotationMatrix = new THREE.Matrix4();
+  // rotationMatrix.makeRotationFromEuler(Tetris.Block.mesh.rotation);
+
+  // for (var i = 0; i < Tetris.Block.shape.length; i++) {
+  //   Tetris.Block.shape[i] = rotationMatrix.set (
+  //     Tetris.Utils.cloneVector(Tetris.Block.shapes[this.blockType][i])
+  //   );
+  //   Tetris.Utils.roundVector(Tetris.Block.shape[i]);
+  // }
+
+  if (Tetris.Board.testCollision(false) === Tetris.Board.COLLISION.WALL) {
+    Tetris.Block.rotate(-x, -y, -z); // laziness FTW
+  }
 };
 
 Tetris.Block.move = function (x, y, z) {
@@ -373,7 +406,19 @@ Tetris.Block.move = function (x, y, z) {
 
   Tetris.Block.mesh.position.z += z * Tetris.blockSize;
   Tetris.Block.position.z += z;
-  if (Tetris.Block.position.z == 0) Tetris.Block.hitBottom();
+
+  var collision = Tetris.Board.testCollision(z != 0);
+
+  if (collision === Tetris.Board.COLLISION.WALL) {
+    Tetris.Block.move(-x, -y, 0); // laziness FTW
+  }
+  if (collision === Tetris.Board.COLLISION.GROUND) {
+    Tetris.Block.hitBottom();
+    //Tetris.sounds["collision"].play();
+    //Tetris.Board.checkCompleted();
+  } else {
+    //Tetris.sounds["move"].play();
+  }
 };
 
 Tetris.Block.hitBottom = function () {
@@ -390,6 +435,10 @@ Tetris.Block.petrify = function () {
       Tetris.Block.position.y + shape[i].y,
       Tetris.Block.position.z + shape[i].z
     );
+
+    Tetris.Board.fields[Tetris.Block.position.x + shape[i].x][
+      Tetris.Block.position.y + shape[i].y
+    ][Tetris.Block.position.z + shape[i].z] = Tetris.Board.FIELD.PETRIFIED;
   }
 };
 
@@ -439,3 +488,61 @@ window.addEventListener(
   },
   false
 );
+
+//Tetris board logic
+Tetris.Board = {};
+
+Tetris.Board.COLLISION = { NONE: 0, WALL: 1, GROUND: 2 };
+Object.freeze(Tetris.Board.COLLISION);
+
+Tetris.Board.FIELD = { EMPTY: 0, ACTIVE: 1, PETRIFIED: 2 };
+Object.freeze(Tetris.Board.FIELD);
+
+Tetris.Board.fields = [];
+
+Tetris.Board.init = function (_x, _y, _z) {
+  for (var x = 0; x < _x; x++) {
+    Tetris.Board.fields[x] = [];
+    for (var y = 0; y < _y; y++) {
+      Tetris.Board.fields[x][y] = [];
+      for (var z = 0; z < _z; z++) {
+        Tetris.Board.fields[x][y][z] = Tetris.Board.FIELD.EMPTY;
+      }
+    }
+  }
+};
+
+Tetris.Board.testCollision = function (ground_check) {
+  var x, y, z, i;
+
+  // shorthands
+  var fields = Tetris.Board.fields;
+  var posx = Tetris.Block.position.x,
+    posy = Tetris.Block.position.y,
+    posz = Tetris.Block.position.z,
+    shape = Tetris.Block.shape;
+
+  for (i = 0; i < shape.length; i++) {
+    // 4 walls detection for every part of the shape
+    if (
+      shape[i].x + posx < 0 ||
+      shape[i].y + posy < 0 ||
+      shape[i].x + posx >= fields.length ||
+      shape[i].y + posy >= fields[0].length
+    ) {
+      return Tetris.Board.COLLISION.WALL;
+    }
+
+    if (
+      fields[shape[i].x + posx][shape[i].y + posy][shape[i].z + posz - 1] ===
+      Tetris.Board.FIELD.PETRIFIED
+    ) {
+      return ground_check
+        ? Tetris.Board.COLLISION.GROUND
+        : Tetris.Board.COLLISION.WALL;
+    }
+    if (shape[i].z + posz <= 0) {
+      return Tetris.Board.COLLISION.GROUND;
+    }
+  }
+};
