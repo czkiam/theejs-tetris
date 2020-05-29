@@ -1,6 +1,7 @@
 import * as THREE from "../build/three.module.js";
 
 import { OrbitControls } from "../libs/jsm/controls/OrbitControls.js";
+import { SceneUtils } from "../libs/jsm/utils/SceneUtils.js";
 import Stats from "../libs/jsm/libs/stats.module.js";
 var clock;
 
@@ -164,6 +165,74 @@ function update() {
   requestAnimationFrame(update);
   Tetris.renderer.render(Tetris.scene, Tetris.camera);
   Tetris.stats.update();
+}
+
+Tetris.staticBlocks = [];
+Tetris.zColors = [
+  0x6666ff,
+  0x66ffff,
+  0xcc68ee,
+  0x666633,
+  0x66ff66,
+  0x9966ff,
+  0x00ff66,
+  0x66ee33,
+  0x003399,
+  0x330099,
+  0xffa500,
+  0x99ff00,
+  0xee1289,
+  0x71c671,
+  0x00bfff,
+  0x666633,
+  0x669966,
+  0x9966ff,
+];
+
+// test in dev console
+// var i = 0,j = 0,k = 0,interval = setInterval(function () {if (i == 6) {i = 0;j++;}if (j == 6) {j = 0;k++;}if (k == 20) {clearInterval(interval);return;}console.log(`block(${i}, ${j}, ${k})`);Tetris.addStaticBlock(i, j, k);i++;}, 30);
+
+Tetris.addStaticBlock = function (x, y, z) {
+  if (Tetris.staticBlocks[x] === undefined) Tetris.staticBlocks[x] = [];
+  if (Tetris.staticBlocks[x][y] === undefined) Tetris.staticBlocks[x][y] = [];
+
+  var mesh = SceneUtils.createMultiMaterialObject(
+    new THREE.CubeGeometry(
+      Tetris.blockSize,
+      Tetris.blockSize,
+      Tetris.blockSize
+    ),
+    [
+      new THREE.MeshBasicMaterial({
+        color: 0x000000,
+        flatShading: true,
+        wireframe: true,
+        transparent: true,
+      }),
+      new THREE.MeshBasicMaterial({ color: Tetris.zColors[z] }),
+    ]
+  );
+
+  mesh.position.x =
+    (x - Tetris.boundingBoxConfig.splitX / 2) * Tetris.blockSize +
+    Tetris.blockSize / 2;
+  mesh.position.y =
+    (y - Tetris.boundingBoxConfig.splitY / 2) * Tetris.blockSize +
+    Tetris.blockSize / 2;
+  mesh.position.z =
+    (z - Tetris.boundingBoxConfig.splitZ / 2) * Tetris.blockSize +
+    Tetris.blockSize / 2;
+  mesh.overdraw = true;
+
+  Tetris.scene.add(mesh);
+  Tetris.staticBlocks[x][y][z] = mesh;
+};
+
+Tetris.currentPoints = 0;
+Tetris.addPoints = function(n) {
+  Tetris.currentPoints += n;
+  Tetris.pointsDOM.innerHTML = Tetris.currentPoints;
+  Cufon.replace('#points');
 }
 
 function resize() {
