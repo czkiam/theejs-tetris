@@ -29,9 +29,9 @@ Tetris.init = function () {
     FAR
   );
   //Tetris.camera.position.set(0, 0, 600);
-  //Tetris.camera.position.set(-10, 12, 12);
+  Tetris.camera.position.set(-1000, 12, 1200);
   // Tetris.camera.position.y = 100;
-  Tetris.camera.position.z = 1100;
+  //Tetris.camera.position.z = 1100;
 
   const ambient = new THREE.HemisphereLight(0xffffbb, 0x080820);
   Tetris.scene.add(ambient);
@@ -135,7 +135,7 @@ Tetris.start = function () {
 
   //Tetris.sounds["theme"].pause();
 
-  //Tetris.Block.generate();
+  Tetris.Block.generate();
   Tetris.animate = true;
 };
 
@@ -157,6 +157,7 @@ function update() {
     while (Tetris.cumulatedFrameTime > Tetris.gameStepTime) {
       // block movement will go here
       Tetris.cumulatedFrameTime -= Tetris.gameStepTime;
+      Tetris.Block.move(0, 0, -1);
     }
 
     if (Tetris.gameOver) Tetris.animate = false;
@@ -229,11 +230,11 @@ Tetris.addStaticBlock = function (x, y, z) {
 };
 
 Tetris.currentPoints = 0;
-Tetris.addPoints = function(n) {
+Tetris.addPoints = function (n) {
   Tetris.currentPoints += n;
   Tetris.pointsDOM.innerHTML = Tetris.currentPoints;
-  Cufon.replace('#points');
-}
+  Cufon.replace("#points");
+};
 
 function resize() {
   Tetris.camera.aspect = window.innerWidth / window.innerHeight;
@@ -242,3 +243,199 @@ function resize() {
 }
 
 window.addEventListener("load", Tetris.init);
+
+//Tetris Block Logic
+Tetris.Utils = {};
+
+Tetris.Utils.cloneVector = function (v) {
+  return { x: v.x, y: v.y, z: v.z };
+};
+
+Tetris.Block = {};
+
+Tetris.Block.shapes = [
+  [
+    { x: 0, y: 0, z: 0 },
+    { x: 1, y: 0, z: 0 },
+    { x: 1, y: 1, z: 0 },
+    { x: 1, y: 2, z: 0 },
+  ],
+  [
+    { x: 0, y: 0, z: 0 },
+    { x: 0, y: 1, z: 0 },
+    { x: 0, y: 2, z: 0 },
+  ],
+  [
+    { x: 0, y: 0, z: 0 },
+    { x: 0, y: 1, z: 0 },
+    { x: 1, y: 0, z: 0 },
+    { x: 1, y: 1, z: 0 },
+  ],
+  [
+    { x: 0, y: 0, z: 0 },
+    { x: 0, y: 1, z: 0 },
+    { x: 0, y: 2, z: 0 },
+    { x: 1, y: 1, z: 0 },
+  ],
+  [
+    { x: 0, y: 0, z: 0 },
+    { x: 0, y: 1, z: 0 },
+    { x: 1, y: 1, z: 0 },
+    { x: 1, y: 2, z: 0 },
+  ],
+];
+
+Tetris.Block.position = {};
+
+Tetris.Block.generate = function () {
+  var geometry, tmpGeometryMesh;
+
+  var type = Math.floor(Math.random() * Tetris.Block.shapes.length);
+  this.blockType = type;
+
+  Tetris.Block.shape = [];
+  for (var i = 0; i < Tetris.Block.shapes[type].length; i++) {
+    Tetris.Block.shape[i] = Tetris.Utils.cloneVector(
+      Tetris.Block.shapes[type][i]
+    );
+  }
+
+  geometry =  new THREE.CubeGeometry()
+
+  tmpGeometryMesh = new THREE.Mesh(new THREE.CubeGeometry(
+    Tetris.blockSize,
+    Tetris.blockSize,
+    Tetris.blockSize
+  ));
+
+  tmpGeometryMesh.updateMatrix()
+  geometry.merge(tmpGeometryMesh.geometry, tmpGeometryMesh.matrix)
+  
+  for (var i = 1; i < Tetris.Block.shape.length; i++) {
+    tmpGeometryMesh = new THREE.Mesh(new THREE.CubeGeometry(
+      Tetris.blockSize,
+      Tetris.blockSize,
+      Tetris.blockSize
+    ));
+    tmpGeometryMesh.position.x = Tetris.blockSize * Tetris.Block.shape[i].x;
+    tmpGeometryMesh.position.y = Tetris.blockSize * Tetris.Block.shape[i].y;
+    tmpGeometryMesh.updateMatrix(); // as needed
+    geometry.merge(tmpGeometryMesh.geometry, tmpGeometryMesh.matrix);
+  }
+
+  Tetris.Block.mesh = SceneUtils.createMultiMaterialObject(geometry, [
+    new THREE.MeshBasicMaterial({
+      color: 0x000000,
+      shading: THREE.FlatShading,
+      wireframe: true,
+      transparent: true,
+    }),
+    new THREE.MeshBasicMaterial({ color: 0xff0000 }),
+  ]);
+
+  // initial position
+  Tetris.Block.position = {
+    x: Math.floor(Tetris.boundingBoxConfig.splitX / 2) - 1,
+    y: Math.floor(Tetris.boundingBoxConfig.splitY / 2) - 1,
+    z: 15,
+  };
+
+  Tetris.Block.mesh.position.x =
+    ((Tetris.Block.position.x - Tetris.boundingBoxConfig.splitX / 2) *
+      Tetris.blockSize) /
+    2;
+  Tetris.Block.mesh.position.y =
+    ((Tetris.Block.position.y - Tetris.boundingBoxConfig.splitY / 2) *
+      Tetris.blockSize) /
+    2;
+  Tetris.Block.mesh.position.z =
+    (Tetris.Block.position.z - Tetris.boundingBoxConfig.splitZ / 2) *
+      Tetris.blockSize +
+    Tetris.blockSize / 2;
+  Tetris.Block.mesh.rotation.set( 0, 0, 0 )
+  Tetris.Block.mesh.overdraw = true;
+
+  Tetris.scene.add(Tetris.Block.mesh);
+}; // end of Tetris.Block.generate()
+
+Tetris.Block.rotate = function (x, y, z) {
+  Tetris.Block.mesh.rotation.x += (x * Math.PI) / 180;
+  Tetris.Block.mesh.rotation.y += (y * Math.PI) / 180;
+  Tetris.Block.mesh.rotation.z += (z * Math.PI) / 180;
+};
+
+Tetris.Block.move = function (x, y, z) {
+  Tetris.Block.mesh.position.x += x * Tetris.blockSize;
+  Tetris.Block.position.x += x;
+
+  Tetris.Block.mesh.position.y += y * Tetris.blockSize;
+  Tetris.Block.position.y += y;
+
+  Tetris.Block.mesh.position.z += z * Tetris.blockSize;
+  Tetris.Block.position.z += z;
+  if (Tetris.Block.position.z == 0) Tetris.Block.hitBottom();
+};
+
+Tetris.Block.hitBottom = function () {
+  Tetris.Block.petrify();
+  Tetris.scene.remove(Tetris.Block.mesh);
+  Tetris.Block.generate();
+};
+
+Tetris.Block.petrify = function () {
+  var shape = Tetris.Block.shape;
+  for (var i = 0; i < shape.length; i++) {
+    Tetris.addStaticBlock(
+      Tetris.Block.position.x + shape[i].x,
+      Tetris.Block.position.y + shape[i].y,
+      Tetris.Block.position.z + shape[i].z
+    );
+  }
+};
+
+window.addEventListener(
+  "keydown",
+  function (event) {
+    var key = event.which ? event.which : event.keyCode;
+
+    switch (key) {
+      case 38: // up (arrow)
+        Tetris.Block.move(0, 1, 0);
+        break;
+      case 40: // down (arrow)
+        Tetris.Block.move(0, -1, 0);
+        break;
+      case 37: // left(arrow)
+        Tetris.Block.move(-1, 0, 0);
+        break;
+      case 39: // right (arrow)
+        Tetris.Block.move(1, 0, 0);
+        break;
+      case 32: // space
+        Tetris.Block.move(0, 0, -1);
+        break;
+
+      case 87: // up (w)
+        Tetris.Block.rotate(90, 0, 0);
+        break;
+      case 83: // down (s)
+        Tetris.Block.rotate(-90, 0, 0);
+        break;
+
+      case 65: // left(a)
+        Tetris.Block.rotate(0, 0, 90);
+        break;
+      case 68: // right (d)
+        Tetris.Block.rotate(0, 0, -90);
+        break;
+
+      case 81: // (q)
+        Tetris.Block.rotate(0, 90, 0);
+        break;
+      case 69: // (e)
+        Tetris.Block.rotate(0, -90, 0);
+        break;
+    }
+  },
+  false
+);
