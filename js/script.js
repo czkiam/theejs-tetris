@@ -257,7 +257,11 @@ Tetris.Utils.cloneVector = function (v) {
   return { x: v.x, y: v.y, z: v.z };
 };
 
-Tetris.Utils.roundVector = function(v) {
+Tetris.Utils.cloneVector3 = function (v) {
+  return new THREE.Vector3(v.x, v.y, v.z);
+};
+
+Tetris.Utils.roundVector = function (v) {
   v.x = Math.round(v.x);
   v.y = Math.round(v.y);
   v.z = Math.round(v.z);
@@ -381,16 +385,19 @@ Tetris.Block.rotate = function (x, y, z) {
   Tetris.Block.mesh.rotation.x += (x * Math.PI) / 180;
   Tetris.Block.mesh.rotation.y += (y * Math.PI) / 180;
   Tetris.Block.mesh.rotation.z += (z * Math.PI) / 180;
-  Tetris.Block.mesh.updateMatrix();
-  // var rotationMatrix = new THREE.Matrix4();
-  // rotationMatrix.makeRotationFromEuler(Tetris.Block.mesh.rotation);
+  //Tetris.Block.mesh.updateMatrix();
+  var rotationMatrix = new THREE.Matrix4();
+  rotationMatrix.makeRotationFromEuler(Tetris.Block.mesh.rotation);
 
-  // for (var i = 0; i < Tetris.Block.shape.length; i++) {
-  //   Tetris.Block.shape[i] = rotationMatrix.set (
-  //     Tetris.Utils.cloneVector(Tetris.Block.shapes[this.blockType][i])
-  //   );
-  //   Tetris.Utils.roundVector(Tetris.Block.shape[i]);
-  // }
+  for (var i = 0; i < Tetris.Block.shape.length; i++) {
+    var newVec3 = Tetris.Utils.cloneVector3(
+      Tetris.Block.shapes[this.blockType][i]
+    );
+
+    Tetris.Block.shape[i] = newVec3.applyMatrix4(rotationMatrix);
+
+    Tetris.Utils.roundVector(Tetris.Block.shape[i]);
+  }
 
   if (Tetris.Board.testCollision(false) === Tetris.Board.COLLISION.WALL) {
     Tetris.Block.rotate(-x, -y, -z); // laziness FTW
@@ -415,7 +422,7 @@ Tetris.Block.move = function (x, y, z) {
   if (collision === Tetris.Board.COLLISION.GROUND) {
     Tetris.Block.hitBottom();
     //Tetris.sounds["collision"].play();
-    //Tetris.Board.checkCompleted();
+    Tetris.Board.checkCompleted();
   } else {
     //Tetris.sounds["move"].play();
   }
@@ -543,6 +550,70 @@ Tetris.Board.testCollision = function (ground_check) {
     }
     if (shape[i].z + posz <= 0) {
       return Tetris.Board.COLLISION.GROUND;
+    }
+  }
+};
+
+Tetris.Board.checkCompleted = function () {
+  var x,
+    y,
+    z,
+    x2,
+    y2,
+    z2,
+    fields = Tetris.Board.fields;
+  var rebuild = false;
+
+  var sum,
+    expected = fields[0].length * fields.length,
+    bonus = 0;
+
+  for (z = 0; z < fields[0][0].length; z++) {
+    sum = 0;
+    for (y = 0; y < fields[0].length; y++) {
+      for (x = 0; x < fields.length; x++) {
+        if (fields[x][y][z] === Tetris.Board.FIELD.PETRIFIED) sum++;
+      }
+    }
+
+    if (sum == expected) {
+      bonus += 1 + bonus; // 1, 3, 7, 15...
+
+      for (y2 = 0; y2 < fields[0].length; y2++) {
+        for (x2 = 0; x2 < fields.length; x2++) {
+          for (z2 = z; z2 < fields[0][0].length - 1; z2++) {
+            Tetris.Board.fields[x2][y2][z2] = fields[x2][y2][z2 + 1];
+          }
+          Tetris.Board.fields[x2][y2][fields[0][0].length - 1] =
+            Tetris.Board.FIELD.EMPTY;
+        }
+      }
+      rebuild = true;
+      z--;
+    }
+  }
+  if (bonus) {
+    Tetris.addPoints(1000 * bonus);
+  }
+  if (rebuild) {
+    for (var z = 0; z < fields[0][0].length - 1; z++) {
+      for (var y = 0; y < fields[0].length; y++) {
+        for (var x = 0; x < fields.length; x++) {
+          if (
+            fields[x][y][z] === Tetris.Board.FIELD.PETRIFIED &&
+            !Tetris.staticBlocks[x][y][z]
+          ) {
+            Tetris.addStaticBlock(x, y, z);
+          }
+          if (
+            fields[x][y][z] == Tetris.Board.FIELD.EMPTY &&
+            Tetris.staticBlocks[x][y][z]
+          ) {
+            Tetris.scene.removeObject(Tetris.staticBlocks[x][y][z]);
+            Tetris.staticBlocks[x][y][z] = undefined;
+          }
+        }
+      }
     }
   }
 };
